@@ -194,7 +194,7 @@ function dispatch(
     const state = yield* status.current
     const app = yield* Ref.get(application)
     const ready = state.type === "ready" && Option.isSome(app)
-    if (request.method === "GET" && url.pathname === "/api/info" && !ready) {
+    if (request.method === "GET" && url.pathname === "/api/info") {
       if (!(yield* authorizedRequest(request, auth))) return unauthorizedResponse(request)
       return yield* infoResponse(status, version, urls, tmp)
     }
