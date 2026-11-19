@@ -2,6 +2,11 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator"
 
 GlobalRegistrator.register()
 
+// happy-dom 21 exposes `getAnimations()` but never tracks CSS transitions, so a caller that feature-detects the Web
+// Animations API sees zero running transitions instead of no API at all. Remove the stub to keep the happy-dom 20
+// behavior, where presence detection trusts the computed transition.
+Reflect.deleteProperty(Element.prototype, "getAnimations")
+
 const originalGetContext = HTMLCanvasElement.prototype.getContext
 
 // @ts-expect-error - we're overriding with a simplified mock
