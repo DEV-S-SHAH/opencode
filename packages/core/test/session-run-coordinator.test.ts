@@ -708,4 +708,58 @@ describe("SessionRunCoordinator", () => {
       expect(runs).toBe(limit)
     }),
   )
+
+  it.effect("awaitIdle waits for successor execution when wake arrives during settle window", () =>
+    Effect.gen(function* () {
+      // This test reproduces the race condition fixed by resolving Deferred before
+      // removing execution from the map. The scenario:
+      // 1. Execution A runs and settles (Deferred resolved, then deleted from map)
+      // 2. A wake arrives during the settle window, starting Execution B
+      // 3. awaitIdle should wait for Execution B, not return immediately
+      const firstStarted = yield* Deferred.make<void>()
+      const firstGate = yield* Deferred.make<void>()
+      const secondStarted = yield* Deferred.make<void>()
+      const secondGate = yield* Deferred.make<void>()
+      const coordinator = yield* SessionRunCoordinator.make({
+        drain: (key: string, force: boolean, scope: "input" | "steer") =>
+          Effect.suspend(() => {
+            if (scope === "steer") {
+              return Deferred.succeed(firstStarted, undefined).pipe(Effect.andThen(Deferred.await(firstGate)))
+            } else {
+              return Deferred.succeed(secondStarted, undefined).pipe(Effect.andThen(Deferred.await(secondGate)))
+            }
+          }),
+      })
+
+      // Start first execution with "steer" scope
+      yield* coordinator.wake("session", "steer")
+      yield* Deferred.await(firstStarted)
+      expect(yield* coordinator.isActive("session")).toBe(true)
+
+      // Start awaitIdle while first execution is running
+      const idleFiber = yield* coordinator.awaitIdle("session").pipe(Effect.forkChild)
+
+      // End first execution - this will trigger settle (resolve Deferred, then delete from map)
+      yield* Deferred.succeed(firstGate, undefined)
+      // Wait for first execution to fully settle
+      yield* Effect.yieldNow
+
+      // Now wake during the settle window - after Deferred resolved but potentially
+      // before map deletion (or during the recursive awaitIdle check)
+      yield* coordinator.wake("session", "input")
+
+      // Second execution should start
+      yield* Deferred.await(secondStarted)
+      expect(yield* coordinator.isActive("session")).toBe(true)
+
+      // End second execution
+      yield* Deferred.succeed(secondGate, undefined)
+      yield* Effect.yieldNow
+
+      // awaitIdle should complete (it waited for both executions)
+      yield* Fiber.join(idleFiber)
+
+      expect(yield* coordinator.isActive("session")).toBe(false)
+    }),
+  )
 })

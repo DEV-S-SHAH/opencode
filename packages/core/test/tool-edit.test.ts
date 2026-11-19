@@ -704,7 +704,10 @@ describe("EditTool", () => {
       // A CRLF file with a block pasted in from an LF editor, edited with surrounding context.
       const target = path.join(tmp.path, "store.cs")
       return Effect.promise(() =>
-        fs.writeFile(target, "All(item.Sku);\r\n\r\nFind(sku);\r\n\r\nvoid Add()\n{\n  _items[item.Sku] = item;\n}\r\n"),
+        fs.writeFile(
+          target,
+          "All(item.Sku);\r\n\r\nFind(sku);\r\n\r\nvoid Add()\n{\n  _items[item.Sku] = item;\n}\r\n",
+        ),
       ).pipe(
         Effect.andThen(
           withTool(tmp.path, edit, (registry) =>
@@ -748,7 +751,10 @@ describe("EditTool", () => {
           withTool(tmp.path, edit, (registry) =>
             Effect.gen(function* () {
               expect(
-                yield* executeTool(registry, call({ path: "strip.sh", oldString: "\r", newString: "", replaceAll: true })),
+                yield* executeTool(
+                  registry,
+                  call({ path: "strip.sh", oldString: "\r", newString: "", replaceAll: true }),
+                ),
               ).toMatchObject({ status: "completed", output: "Edited strip.sh (2 replacements)" })
               expect(
                 yield* executeTool(registry, call({ path: "whole.sh", oldString: "x\r\ny\r\n", newString: "x\ny\n" })),
@@ -788,7 +794,10 @@ describe("EditTool", () => {
             Effect.gen(function* () {
               // The typography tier matches the curly quote, and the replacement writes the same bytes back.
               expect(
-                yield* executeTool(registry, call({ path: "quote.txt", oldString: "it's here", newString: "it’s here" })),
+                yield* executeTool(
+                  registry,
+                  call({ path: "quote.txt", oldString: "it's here", newString: "it’s here" }),
+                ),
               ).toEqual({
                 status: "error",
                 error: {
@@ -855,6 +864,36 @@ describe("EditTool", () => {
             expect(yield* Effect.promise(() => fs.readFile(target, "utf8"))).toBe("after\n")
             expect(edit.writes).toEqual([target])
           }),
+        ),
+      )
+    }),
+  )
+
+  it.live("refuses a file that is not valid UTF-8 instead of replacing its bytes with U+FFFD", () =>
+    withTempDir((tmp) => {
+      const edit = makeEditFixture()
+      const target = path.join(tmp.path, "gbk.ts")
+      const bytes = new Uint8Array([...new TextEncoder().encode("const x = 1\n// "), 0xd6, 0xd0, 0xce, 0xc4, 0x0a])
+      return Effect.promise(() => fs.writeFile(target, bytes)).pipe(
+        Effect.andThen(
+          withTool(tmp.path, edit, (registry) =>
+            Effect.gen(function* () {
+              expect(
+                yield* executeTool(
+                  registry,
+                  call({ path: "gbk.ts", oldString: "const x = 1", newString: "const y = 1" }),
+                ),
+              ).toEqual({
+                status: "error",
+                error: {
+                  type: "tool.execution",
+                  message: `File is not valid UTF-8: ${target}. Convert it to UTF-8 first: editing it would replace every non-UTF-8 byte with U+FFFD.`,
+                },
+              })
+              expect(edit.writes).toEqual([])
+              expect(new Uint8Array(yield* Effect.promise(() => fs.readFile(target)))).toEqual(bytes)
+            }),
+          ),
         ),
       )
     }),

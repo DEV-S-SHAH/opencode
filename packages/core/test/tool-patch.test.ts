@@ -427,7 +427,9 @@ describe("PatchTool", () => {
         expect(
           yield* executeTool(
             registry,
-            call("*** Begin Patch\n*** Update File: same.txt\n*** Move to: Same.txt\n@@\n-before\n+after\n*** End Patch"),
+            call(
+              "*** Begin Patch\n*** Update File: same.txt\n*** Move to: Same.txt\n@@\n-before\n+after\n*** End Patch",
+            ),
           ),
         ).toMatchObject({ status: "completed" })
         expect(yield* Effect.promise(() => fs.readdir(directory))).toEqual(["Same.txt"])
@@ -446,7 +448,9 @@ describe("PatchTool", () => {
         expect(
           yield* executeTool(
             registry,
-            call("*** Begin Patch\n*** Update File: Foo/a.txt\n*** Move to: foo/a.txt\n@@\n-before\n+after\n*** End Patch"),
+            call(
+              "*** Begin Patch\n*** Update File: Foo/a.txt\n*** Move to: foo/a.txt\n@@\n-before\n+after\n*** End Patch",
+            ),
           ),
         ).toMatchObject({ status: "completed" })
         expect(yield* Effect.promise(() => fs.readFile(path.join(directory, "foo", "a.txt"), "utf8"))).toBe("after\n")
@@ -1236,6 +1240,29 @@ describe("PatchTool", () => {
         }),
       )
     }),
+  )
+
+  it.live("refuses a file that is not valid UTF-8 instead of replacing its bytes with U+FFFD", () =>
+    withTempTool((directory, registry) =>
+      Effect.gen(function* () {
+        const target = path.join(directory, "gbk.ts")
+        const bytes = new Uint8Array([...new TextEncoder().encode("const x = 1\n// "), 0xd6, 0xd0, 0xce, 0xc4, 0x0a])
+        yield* Effect.promise(() => fs.writeFile(target, bytes))
+        expect(
+          yield* executeTool(
+            registry,
+            call("*** Begin Patch\n*** Update File: gbk.ts\n@@\n-const x = 1\n+const y = 1\n*** End Patch"),
+          ),
+        ).toEqual({
+          status: "error",
+          error: {
+            type: "tool.execution",
+            message: `patch verification failed: Failed to read file to update ${target}: file is not valid UTF-8`,
+          },
+        })
+        expect(new Uint8Array(yield* Effect.promise(() => fs.readFile(target)))).toEqual(bytes)
+      }),
+    ),
   )
 
   it.live("preserves a later commit defect after earlier sequential applications", () =>

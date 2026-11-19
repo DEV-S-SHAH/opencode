@@ -113,6 +113,12 @@ export const make = <Key, E, Reason = never>(options: {
     // A doorbell that survives the execution loop (rung after the loop decided to end, or
     // during failure or interruption cleanup) starts a fresh execution for the remaining work.
     const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) => {
+      // CRITICAL ORDER: We must delete from the map BEFORE resolving the Deferred.
+      // If we resolve first, awaitIdle will loop infinitely:
+      // - It checks the map, finds the execution
+      // - Awaits the Deferred (already resolved, returns immediately)
+      // - Checks the map again, finds the same execution
+      // - Awaits the Deferred again... infinite loop
       if (execution.pendingWake) start(key, false, execution.pendingWake)
       else executions.delete(key)
       Deferred.doneUnsafe(execution.done, exit)

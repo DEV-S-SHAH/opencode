@@ -405,6 +405,15 @@ const layer = Layer.effect(
         yield* result.get(sessionID)
         yield* execution.interrupt(sessionID)
         yield* execution.awaitIdle(sessionID)
+        // Double-check that execution is truly idle to prevent race conditions during
+        // high-frequency event storms (e.g., provider/config reload on credential switch).
+        // If a new execution started after awaitIdle returned, interrupt again.
+        const stillActive = yield* execution.isActive(sessionID)
+        if (stillActive) {
+          yield* Effect.logWarning("Session still active after awaitIdle, interrupting again", { sessionID })
+          yield* execution.interrupt(sessionID)
+          yield* execution.awaitIdle(sessionID)
+        }
         yield* jobs.cancelSession(sessionID)
         yield* transport.close(sessionID)
         const children = yield* store.list({ parentID: sessionID })
