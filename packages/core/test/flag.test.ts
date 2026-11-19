@@ -133,12 +133,13 @@ describe("Flag.resolve", () => {
     })
   })
 
-  test("reads experimental from the highest-priority document that sets it, as before", () => {
+  test("reads experimental fields independently across priority-ordered documents", () => {
     const flags = Flag.resolve({
       entries: [document({ full_codemode: true }), document({ subagent_depth: 2 }), document()],
       channel: "latest",
     })
-    expect([flags.full_codemode.enabled, flags.full_codemode.source]).toEqual([false, "default"])
+    // full_codemode is set in the lowest-priority document and not overridden by higher ones
+    expect([flags.full_codemode.enabled, flags.full_codemode.source]).toEqual([true, "config"])
   })
 
   test("OPENCODE_FLAGS=all turns every flag on, and a -key in the same list still wins", () => {

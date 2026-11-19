@@ -317,7 +317,7 @@ const projectFork = Effect.fn("SessionProjector.projectFork")(function* (
 const partRowsEnabled = Effect.gen(function* () {
   const config = yield* Effect.serviceOption(Config.Service)
   if (Option.isNone(config)) return false
-  return Config.latest(yield* config.value.entries(), "experimental")?.part_rows === true
+  return Config.latestField(yield* config.value.entries(), "part_rows") === true
 })
 
 type MessageRow = typeof SessionMessageTable.$inferSelect

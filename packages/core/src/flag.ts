@@ -55,7 +55,6 @@ export function resolve(input: {
       .map((item): [string, boolean] => (item.startsWith("-") ? [item.slice(1), false] : [item, true])),
   )
   const all = env.get(ConfigFlag.wildcard) === true
-  const experimental = Config.latest(input.entries, "experimental")
   const allFlags =
     input.entries.findLast(
       (entry): entry is Document => entry.type === "document" && entry.info.experimental?.all_flags !== undefined,
@@ -66,7 +65,8 @@ export function resolve(input: {
     const old = names.find((name) => ConfigFlag.aliases[name] === key)
     const override =
       env.get(key) ?? (old === undefined ? undefined : env.get(old)) ?? (all && !optInOnly ? true : undefined)
-    const value = experimental?.[key] ?? (old === undefined ? undefined : experimental?.[old])
+    const value =
+      Config.latestField(input.entries, key) ?? (old === undefined ? undefined : Config.latestField(input.entries, old))
     // A flag that takes settings is on when given them.
     const configured = typeof value === "object" ? true : (value ?? (allFlags && !optInOnly ? true : undefined))
     const [enabled, source]: [boolean, State["source"]] =

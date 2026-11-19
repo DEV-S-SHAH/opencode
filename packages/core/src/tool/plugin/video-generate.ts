@@ -3,7 +3,7 @@ export * as VideoGenerateTool from "./video-generate.js"
 import path from "path"
 import { Media, ToolFailure, VideoAspectRatio } from "@opencode/ai/effect"
 import type { Context } from "@opencode/plugin/effect/plugin"
-import type { Document, Entry } from "@opencode/schema/config"
+import type { Entry } from "@opencode/schema/config"
 import type { VideoID } from "@opencode/schema/generate"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
@@ -382,9 +382,7 @@ export const Plugin = {
 
 // Read per field so a later config that sets other experimental options doesn't hide this one.
 function configuredModel(entries: readonly Entry[]) {
-  const value = entries.findLast(
-    (entry): entry is Document => entry.type === "document" && entry.info.experimental?.video_generate !== undefined,
-  )?.info.experimental?.video_generate
+  const value = Config.latestField(entries, "video_generate")
   return typeof value === "object" ? value.model : undefined
 }
 

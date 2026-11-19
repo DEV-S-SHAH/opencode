@@ -11,7 +11,7 @@ export const reached = Effect.fnUntraced(function* (
   sessions: Session.Interface,
   config: Config.Interface,
 ) {
-  const limit = Config.latest(yield* config.entries(), "experimental")?.subagent_depth ?? 1
+  const limit = Config.latestField(yield* config.entries(), "subagent_depth") ?? 1
   let current = parent
   for (let depth = 0; depth < limit; depth++) {
     if (!current.parentID) return undefined
